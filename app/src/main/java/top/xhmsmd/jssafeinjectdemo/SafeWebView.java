@@ -47,8 +47,6 @@ public class SafeWebView extends WebView {
     private String JSInjectName;
     private Object JSObject;
     private String jsInjectStr;
-    private List<String> filterMethodNames = Arrays.asList("equals", "getClass", "hashCode", "notify", "notifyAll", "toString","wait", "access$super");
-
 
     public SafeWebView(Context context) {
         super(context);
@@ -102,22 +100,27 @@ public class SafeWebView extends WebView {
     private void performJSInjectStr(Object object, String jsInjectName) {
         String js = "javascript:" + jsInjectName + "={};";
         for (Method method : object.getClass().getMethods()) {
-            if (null != method && !filterMethodNames.contains(method.getName())) {
+            if (null != method) {
+                Annotation[] annotations = method.getAnnotations();
+                for(Annotation annotation : annotations){
+                    String name = annotation.annotationType().getCanonicalName().toLowerCase();
+                    if(name.endsWith("javascriptinterface")){
+                        // 2017/3/28 生成JS
+                        String paramsStr = "";
+                        String promptParamsStr = "";
+                        for (int i = 1; i <= method.getParameterTypes().length; i++) {
+                            paramsStr += "param" + i + ",";
+                            promptParamsStr += "param" + i + "+','+";
+                        }
+                        if (paramsStr.contains(",")) {
+                            paramsStr = paramsStr.substring(0, paramsStr.length() - 1);
+                            promptParamsStr = promptParamsStr.substring(0, promptParamsStr.length() - 5);
+                        }
+                        String itemJS = jsInjectName + "." + method.getName() + " = function(" + paramsStr + "){ prompt('"+method.getName()+"'," + promptParamsStr + ");};";
+                        js += itemJS;
+                    }
+                }
 
-//                method.getAnnotation(JavascriptInterface.class);
-                // 2017/3/28 生成JS
-                String paramsStr = "";
-                String promptParamsStr = "";
-                for (int i = 1; i <= method.getParameterTypes().length; i++) {
-                    paramsStr += "param" + i + ",";
-                    promptParamsStr += "param" + i + "+','+";
-                }
-                if (paramsStr.contains(",")) {
-                    paramsStr = paramsStr.substring(0, paramsStr.length() - 1);
-                    promptParamsStr = promptParamsStr.substring(0, promptParamsStr.length() - 5);
-                }
-                String itemJS = jsInjectName + "." + method.getName() + " = function(" + paramsStr + "){ prompt('"+method.getName()+"'," + promptParamsStr + ");};";
-                js += itemJS;
             }
         }
         jsInjectStr = js;

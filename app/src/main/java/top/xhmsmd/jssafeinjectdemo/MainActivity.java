@@ -1,3 +1,4 @@
+
 package top.xhmsmd.jssafeinjectdemo;
 
 import android.support.v7.app.AppCompatActivity;
@@ -8,8 +9,7 @@ import android.webkit.WebChromeClient;
 import android.webkit.WebViewClient;
 
 /**
- * Main
- * Created by Pollex on 2017/3/27.
+ * Main Created by Pollex on 2017/3/27.
  */
 public class MainActivity extends AppCompatActivity {
     private final String TAG = "MainActivity";
@@ -29,7 +29,6 @@ public class MainActivity extends AppCompatActivity {
         webView.setWebViewClient(new WebViewClient());
         webView.loadUrl("file:///android_asset/html/JSInjectTest.html");
     }
-
 
     class JSInject {
 
