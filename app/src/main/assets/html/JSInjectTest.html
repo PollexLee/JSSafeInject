@@ -5,7 +5,9 @@
 		<title>JSSafeInjectDemo</title>
 	</head>
 	<body>
-		<h2>JSSafeInjectDemo</h2>
-		<button onclick="window.jsSafeInject.test('wahaha','nice')">测试</button><br/>
+	<script src="///android_asset/html/JsBridge.js"></script>
+	<h2>JSSafeInjectDemo</h2>
+		<button onclick="test()">测试</button><br/>
+	<button onclick="window.jsSafeInject.getAppInfo('device',function(reslut){ alert(reslut)})">获取设备信息</button><br/>
 	</body>
 </html>

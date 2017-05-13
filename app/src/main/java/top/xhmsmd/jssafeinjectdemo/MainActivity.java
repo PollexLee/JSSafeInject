@@ -33,8 +33,17 @@ public class MainActivity extends AppCompatActivity {
     class JSInject {
 
         @JavascriptInterface
-        public void test(String msg, String msg1) {
+        public String test(String msg, String msg1) {
             Log.d(TAG, "test is running,msg = " + msg + ", msg1 = " + msg1);
+            return "这是callback";
+        }
+
+        @JavascriptInterface
+        public String getAppInfo(String key) {
+            if(key.equals("device")){
+                return "Netease MUMU";
+            }
+            return "error";
         }
     }
 }

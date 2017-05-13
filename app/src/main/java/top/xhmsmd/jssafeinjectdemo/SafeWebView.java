@@ -1,3 +1,4 @@
+
 package top.xhmsmd.jssafeinjectdemo;
 
 import android.annotation.SuppressLint;
@@ -69,7 +70,6 @@ public class SafeWebView extends WebView {
             removeJavascriptInterface("accessibilityTraversal");
         }
 
-
         // 默认设置两个空的client，为了避免使用的地方没有设置，造成Client里面调用的代码不被触发
         setWebViewClient(new WebViewClient());
         setWebChromeClient(new WebChromeClient());
@@ -84,17 +84,18 @@ public class SafeWebView extends WebView {
     @SuppressLint("JavascriptInterface")
     @Override
     public void addJavascriptInterface(Object object, String name) {
-//        if (Build.VERSION.SDK_INT >= 17) {
-//            super.addJavascriptInterface(object, name);
-//        } else {
-            JSInjectName = name;
-            JSObject = object;
-            performJSInjectStr(object, JSInjectName);
-//        }
+        // if (Build.VERSION.SDK_INT >= 17) {
+        // super.addJavascriptInterface(object, name);
+        // } else {
+        JSInjectName = name;
+        JSObject = object;
+        performJSInjectStr(object, JSInjectName);
+        // }
     }
 
     /**
      * 根据注入的类，生成JavaScript
+     * 
      * @param object
      */
     private void performJSInjectStr(Object object, String jsInjectName) {
@@ -102,28 +103,54 @@ public class SafeWebView extends WebView {
         for (Method method : object.getClass().getMethods()) {
             if (null != method) {
                 Annotation[] annotations = method.getAnnotations();
-                for(Annotation annotation : annotations){
+                for (Annotation annotation : annotations) {
                     String name = annotation.annotationType().getCanonicalName().toLowerCase();
-                    if(name.endsWith("javascriptinterface")){
+                    if (name.endsWith("javascriptinterface")) {
                         // 2017/3/28 生成JS
-                        String paramsStr = "";
-                        String promptParamsStr = "";
+                        StringBuffer paramsBuffer = new StringBuffer();
+                        StringBuffer promptParamsBuffer = new StringBuffer();
                         for (int i = 1; i <= method.getParameterTypes().length; i++) {
-                            paramsStr += "param" + i + ",";
-                            promptParamsStr += "param" + i + "+','+";
+                            paramsBuffer.append("param");
+                            paramsBuffer.append(i);
+                            paramsBuffer.append(",");
+                            promptParamsBuffer.append("param");
+                            promptParamsBuffer.append(i);
+                            promptParamsBuffer.append("+','+");
                         }
+                        String paramsStr = paramsBuffer.toString();
+                        String promptParamsStr = promptParamsBuffer.toString();
                         if (paramsStr.contains(",")) {
                             paramsStr = paramsStr.substring(0, paramsStr.length() - 1);
-                            promptParamsStr = promptParamsStr.substring(0, promptParamsStr.length() - 5);
+                            promptParamsStr = promptParamsStr
+                                    .substring(0, promptParamsStr.length() - 5);
                         }
-                        String itemJS = jsInjectName + "." + method.getName() + " = function(" + paramsStr + "){ prompt('"+method.getName()+"'," + promptParamsStr + ");};";
+                        String itemJS = jsInjectName + "." + method.getName() + "=function("
+                                + paramsStr + ",callback){" +
+                                "prompt('" + method.getName() + "'+':'+ callback," + promptParamsStr
+                                + ");" +
+                                "};";
                         js += itemJS;
                     }
                 }
-
             }
         }
+        js = js + jsInjectName + ".onFinish=function(callback, jsonObj){" +
+                "callback(jsonObj)}";
         jsInjectStr = js;
+
+        // loadUrl("javascript:jsSafeInject={};" +
+        //// " callbacks = {};\n" +
+        // "jsSafeInject.test=function(param1,param2,callback){\n" +
+        // "alert(\"321\");\n" +
+        // "prompt('test'+': '+ callback,param1+','+param2);\n" +
+        // "};" +
+        // "jsSafeInject.onFinish=function(port, jsonObj){\n" +
+        // "alert(\"321\");\n" +
+        // "port(jsonObj)};\n"
+        // );
+        // "function getId() {\n" +
+        // " return '12'\n" +
+        // " };");
     }
 
     @Override
@@ -155,7 +182,8 @@ public class SafeWebView extends WebView {
             }
 
             @Override
-            public void onShowCustomView(View view, int requestedOrientation, CustomViewCallback callback) {
+            public void onShowCustomView(View view, int requestedOrientation,
+                    CustomViewCallback callback) {
                 client.onShowCustomView(view, requestedOrientation, callback);
             }
 
@@ -165,7 +193,8 @@ public class SafeWebView extends WebView {
             }
 
             @Override
-            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture, Message resultMsg) {
+            public boolean onCreateWindow(WebView view, boolean isDialog, boolean isUserGesture,
+                    Message resultMsg) {
                 return client.onCreateWindow(view, isDialog, isUserGesture, resultMsg);
             }
 
@@ -190,44 +219,57 @@ public class SafeWebView extends WebView {
             }
 
             @Override
-            public boolean onJsPrompt(WebView view, String url, String message, String defaultValue, JsPromptResult result) {
-//                String methodName = "";
-                Log.d("SafeWebView","message = " + message + ", defaultValue = " + defaultValue);
+            public boolean onJsPrompt(WebView view, String url, String message, String defaultValue,
+                    JsPromptResult result) {
+                Log.d("SafeWebView", "message = " + message + ", defaultValue = " + defaultValue);
                 Method[] methods = JSObject.getClass().getMethods();
-                for(Method method : methods){
-                    if(message.equals(method.getName())){
+                Object methodResult = null;
+                String methodName = message.substring(0, message.indexOf(":"));
+                String callback = message.substring(message.indexOf(":") + 1);
+                for (Method method : methods) {
+                    if (methodName.equals(method.getName())) {
+                        Object[] params = defaultValue.split(",");
                         try {
-                            Object[] params = defaultValue.split(",");
-                            method.invoke(JSObject,params);
+                            methodResult = method.invoke(JSObject, params);
                         } catch (IllegalAccessException e) {
                             e.printStackTrace();
                         } catch (InvocationTargetException e) {
                             e.printStackTrace();
                         }
                     }
-
                 }
-                result.confirm("");
+                result.cancel();
+                // if(null == methodResult){
+                // methodResult = "";
+                // }
+                // result.confirm(String.valueOf(methodResult));
+                loadUrl("javascript:window.jsSafeInject.onFinish(" + callback + ",'" + methodResult
+                        + "');");
                 return true;
             }
 
             @Override
-            public boolean onJsBeforeUnload(WebView view, String url, String message, JsResult result) {
+            public boolean onJsBeforeUnload(WebView view, String url, String message,
+                    JsResult result) {
                 return client.onJsBeforeUnload(view, url, message, result);
             }
 
             @Override
-            public void onExceededDatabaseQuota(String url, String databaseIdentifier, long quota, long estimatedDatabaseSize, long totalQuota, WebStorage.QuotaUpdater quotaUpdater) {
+            public void onExceededDatabaseQuota(String url, String databaseIdentifier, long quota,
+                    long estimatedDatabaseSize, long totalQuota,
+                    WebStorage.QuotaUpdater quotaUpdater) {
                 client.onExceededDatabaseQuota(url, databaseIdentifier, quota, estimatedDatabaseSize, totalQuota, quotaUpdater);
             }
 
             @Override
-            public void onReachedMaxAppCacheSize(long requiredStorage, long quota, WebStorage.QuotaUpdater quotaUpdater) {
+            public void onReachedMaxAppCacheSize(long requiredStorage, long quota,
+                    WebStorage.QuotaUpdater quotaUpdater) {
                 client.onReachedMaxAppCacheSize(requiredStorage, quota, quotaUpdater);
             }
 
             @Override
-            public void onGeolocationPermissionsShowPrompt(String origin, GeolocationPermissions.Callback callback) {
+            public void onGeolocationPermissionsShowPrompt(String origin,
+                    GeolocationPermissions.Callback callback) {
                 client.onGeolocationPermissionsShowPrompt(origin, callback);
             }
 
@@ -280,7 +322,8 @@ public class SafeWebView extends WebView {
 
             @TargetApi(Build.VERSION_CODES.LOLLIPOP)
             @Override
-            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback, FileChooserParams fileChooserParams) {
+            public boolean onShowFileChooser(WebView webView, ValueCallback<Uri[]> filePathCallback,
+                    FileChooserParams fileChooserParams) {
                 return client.onShowFileChooser(webView, filePathCallback, fileChooserParams);
             }
         };
@@ -310,6 +353,19 @@ public class SafeWebView extends WebView {
             public void onPageFinished(WebView view, String url) {
                 // 执行JS注入
                 loadUrl(jsInjectStr);
+                // loadUrl("javascript:jsSafeInject={};" +
+                //// " callbacks = {};\n" +
+                // "jsSafeInject.test=function(param1,param2,callback){\n" +
+                // "alert(\"321\");\n" +
+                // "prompt('test'+': '+ callback,param1+','+param2);\n" +
+                // "};" +
+                // "jsSafeInject.onFinish=function(port, jsonObj){\n" +
+                // "alert(\"321\");\n" +
+                // "port(jsonObj)};\n"
+                // );
+                // "function getId() {\n" +
+                // " return '12'\n" +
+                // " };");
                 client.onPageFinished(view, url);
             }
 
@@ -331,7 +387,8 @@ public class SafeWebView extends WebView {
 
             @TargetApi(Build.VERSION_CODES.LOLLIPOP)
             @Override
-            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+            public WebResourceResponse shouldInterceptRequest(WebView view,
+                    WebResourceRequest request) {
                 return client.shouldInterceptRequest(view, request);
             }
 
@@ -341,19 +398,22 @@ public class SafeWebView extends WebView {
             }
 
             @Override
-            public void onReceivedError(WebView view, int errorCode, String description, String failingUrl) {
+            public void onReceivedError(WebView view, int errorCode, String description,
+                    String failingUrl) {
                 client.onReceivedError(view, errorCode, description, failingUrl);
             }
 
             @TargetApi(Build.VERSION_CODES.M)
             @Override
-            public void onReceivedError(WebView view, WebResourceRequest request, WebResourceError error) {
+            public void onReceivedError(WebView view, WebResourceRequest request,
+                    WebResourceError error) {
                 client.onReceivedError(view, request, error);
             }
 
             @TargetApi(Build.VERSION_CODES.M)
             @Override
-            public void onReceivedHttpError(WebView view, WebResourceRequest request, WebResourceResponse errorResponse) {
+            public void onReceivedHttpError(WebView view, WebResourceRequest request,
+                    WebResourceResponse errorResponse) {
                 client.onReceivedHttpError(view, request, errorResponse);
             }
 
@@ -379,7 +439,8 @@ public class SafeWebView extends WebView {
             }
 
             @Override
-            public void onReceivedHttpAuthRequest(WebView view, HttpAuthHandler handler, String host, String realm) {
+            public void onReceivedHttpAuthRequest(WebView view, HttpAuthHandler handler,
+                    String host, String realm) {
                 client.onReceivedHttpAuthRequest(view, handler, host, realm);
             }
 
@@ -399,7 +460,8 @@ public class SafeWebView extends WebView {
             }
 
             @Override
-            public void onReceivedLoginRequest(WebView view, String realm, String account, String args) {
+            public void onReceivedLoginRequest(WebView view, String realm, String account,
+                    String args) {
                 client.onReceivedLoginRequest(view, realm, account, args);
             }
         };
